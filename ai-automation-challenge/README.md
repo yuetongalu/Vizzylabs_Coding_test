@@ -99,53 +99,99 @@ All files are functional. Modify whatever you think needs changing.
 
 ---
 
-## My Problem-Solving Workflow
+## My Approach
 
-My workflow starts with identifying the actual product and system problem before making code changes. In this challenge, the moderation service was functional, but the business problem was that it was too simplistic for real-world moderation. It produced a basic binary decision, lacked explainability, and did not handle conflicting goals between creator experience and trust and safety.
+This challenge is not mainly about making the code run. The code already runs. The real task is to improve a moderation system that is functional but not reliable enough for real business use.
 
-After identifying the problem, I diagnose it like a code review. I used AI as a senior engineer partner to inspect the codebase, point out architectural weaknesses, and surface hidden issues such as unused components, missing review flows, weak explainability, and logic that looked configurable but was not actually connected to the decision path. I treat AI as a reviewer and collaborator, not as the decision-maker. The goal is to use AI to accelerate diagnosis while keeping the reasoning and prioritization human-led.
+My approach was to separate technical correctness from product correctness. I first looked for the gap between what the system currently does and what the business actually needs. In this case, the gap was clear: the moderation flow was too binary, not explainable enough, and not flexible enough to handle the tension between Creator Success, Trust and Safety, and Legal.
 
-Once the problems were clear, I solved them with AI assistance by focusing on the highest-value improvements first. Instead of trying to perfect the whole system, I changed the moderation flow so it could support review decisions, clearer reasoning, and more context-aware handling of borderline content. After the implementation, I double-check the solution against other cases such as cooking, fitness, supplement scams, coded hate speech, clear violence, and safe content. That verification step is important because moderation quality depends on how the system behaves across edge cases, not just on whether the code runs.
+## My Problem-Solving Methodology
 
-## Why I Chose This Workflow
+I followed a simple workflow:
 
-I chose this workflow because this challenge is not mainly about writing code quickly. It is about making a good engineering decision under conflicting business requirements. If I start coding too early, I risk improving the wrong thing. By first identifying the problem, then diagnosing it through a code-review mindset, and only then implementing targeted changes, I can focus on solving the business risk instead of only changing syntax or structure.
+1. Identify the real problem.
+   I first ask whether the system solves the business problem, not just whether it runs.
 
-Using AI in this way also reflects how I like to work in practice. AI is most useful when it helps me review assumptions, identify gaps, and accelerate implementation, but the product judgment still comes from me. That is especially important in moderation systems, where the trade-offs affect creators, safety teams, and legal stakeholders.
+2. Diagnose before changing code.
+   I review the codebase to find architectural gaps, weak logic, dead paths, and missing capabilities.
+
+3. Use AI as a senior engineer partner.
+   I use AI to review the code, challenge assumptions, and accelerate analysis, but I keep the product judgment and prioritization human-led.
+
+4. Implement the highest-impact changes first.
+   In a time-limited exercise, I focus on the changes that most directly improve decision quality and reduce risk.
+
+5. Verify with edge cases.
+   I check how the system behaves on ambiguous and high-risk examples, not just a happy path.
+
+## Why I Prompted AI This Way
+
+My first prompt asked AI to inspect the code and explain what problems it recognized before doing any implementation. I did that on purpose. I did not want AI to jump straight into writing code without understanding the system.
+
+I wanted AI to behave like a senior engineer in a code review: read the code first, explain the risks, identify what is missing, and help me decide what to fix. That was important here because the challenge was not a simple bug-fix task. The service already returned responses, but it was still failing the business in meaningful ways.
+
+That first diagnosis helped surface the main issues:
+
+- the moderation flow trusted a simple binary result too much
+- there was no review path for borderline content
+- the output was not explainable enough
+- part of the available AI logic was unused
+- some score-handling logic was incomplete
+
+After that, I gave a more directed implementation prompt:
+
+> So right now, I saw the problem is some part of the code is unused, and the result only trust a really simply binary moderation decision. So Lets enable the part unused, and also make sure:
+> 1. Add a review channel, for content being hestitate to post, let get it into review channel.
+> 2. Add more detailed in the simple discription tagging of the code, and make it explainable.
+> 3. Finished the problem you recognized and debug it. (time limited)
+
+That prompt was based on the diagnosis, not on guesswork.
+
+I chose those instructions for three reasons:
+
+- The code review showed that some useful logic already existed but was not being used, so enabling it was a high-value change.
+- The business requirements showed that a binary allow-or-block decision was too rigid, so a review channel was needed for uncertain cases.
+- Legal and Trust and Safety needed clearer reasoning, so explainability had to become part of the output.
+
+Because the exercise was time-limited, I focused the prompt on practical, high-impact improvements instead of asking AI to redesign the entire system.
 
 ## Problems I Identified
 
-- The moderation flow trusted a simple binary provider flag instead of making a transparent, tunable decision.
-- The service had no review channel for borderline content.
-- The response was not explainable enough for legal, trust and safety, or creator support use cases.
-- A secondary AI client already existed in the codebase but was unused.
-- The score handling logic was incomplete and included a bug in how category scores were processed.
+- The moderation flow relied too heavily on a simple binary provider flag.
+- The system had no review lane for borderline content.
+- The response was not detailed enough to explain moderation decisions.
+- A second AI client existed in the codebase but was not being used.
+- The score-processing path was incomplete and needed debugging.
 
 ## Changes I Made
 
-- Added a multi-stage moderation flow in `moderation_service.py`.
-- Introduced three moderation outcomes: `allow`, `review`, and `block`.
-- Added threshold-based decision logic instead of relying only on a provider's binary flag.
-- Enabled the previously unused Anthropic client as a secondary reviewer for ambiguous or sensitive cases.
-- Expanded the response model in `models.py` to include decision type, category scores, triggered categories, threshold settings, provider assessments, and review requirements.
-- Improved the mock secondary reviewer in `mock_clients.py` so it returns more context-aware reasoning for moderation edge cases.
-- Fixed the score extraction logic so category scores are explicitly read and evaluated instead of being treated as a directly iterable object.
+- Added a multi-stage moderation flow in `moderation_service.py`
+- Introduced three outcomes: `allow`, `review`, and `block`
+- Added threshold-based decision logic instead of trusting only a binary model result
+- Enabled the unused Anthropic client as a secondary reviewer for ambiguous or sensitive cases
+- Expanded the response model in `models.py` to include decision details, category scores, triggered categories, threshold settings, provider assessments, and review flags
+- Improved the secondary reviewer in `mock_clients.py` so it returns more context-aware reasoning
+- Fixed the score extraction logic so category scores are explicitly evaluated
 
-## How These Changes Solve the Problem
+## Why These Changes Solve the Problem
 
-These changes make the system better aligned with the business requirements. The review channel reduces the risk of over-blocking legitimate content, because borderline cases can now be escalated instead of being automatically blocked. The threshold-based logic makes the moderation system more tunable, which is important when different categories need different sensitivity levels. The expanded response structure improves transparency by showing what the system saw, why it made the decision, and which model contributed to the outcome.
+These changes make the moderation system more useful in practice.
 
-Enabling the secondary reviewer also improves context handling. False-positive cases such as cooking, fitness, or medical content can now be reconsidered with more nuance, while subtle harmful cases such as supplement scams or coded hate speech can be escalated for review instead of silently passing through. In other words, the system is no longer only functional; it is closer to being operationally useful.
+The review channel creates a middle path for uncertain content, which helps reduce false positives without simply becoming less strict. The threshold-based logic makes the system more tunable, which is important when different moderation categories need different levels of sensitivity. The richer response model improves transparency by showing what the system detected, why it made a decision, and which model contributed to that decision.
 
-## Verification Mindset
+Using the secondary reviewer also improves context handling. Cases like cooking, fitness, or medical language can now be reconsidered with more nuance, while subtle harmful content like supplement scams or coded hate speech can be escalated instead of being missed.
 
-I verified the changes by checking representative edge cases rather than relying on one happy-path example. The cases I focused on were:
+## Verification
 
-- Cooking content that can look violent out of context
-- Fitness content that can be misread as adult content
-- Supplement scam language that should not be missed
-- Borderline hate speech that needs escalation
-- Clear policy-violating violent content
-- Clearly safe everyday content
+I validated the solution by checking representative edge cases instead of relying on a single happy-path example.
 
-This matters because a moderation system should be evaluated by how it handles ambiguity and trade-offs, not only by whether the endpoint returns a response.
+The cases I focused on were:
+
+- cooking content that can look violent out of context
+- fitness content that can be misread as adult content
+- supplement scam language that should not be missed
+- borderline hate speech that needs escalation
+- clearly unsafe violent content
+- clearly safe everyday content
+
+That matters because moderation systems should be judged by how they handle ambiguity, trade-offs, and edge cases, not only by whether an endpoint returns a response.
