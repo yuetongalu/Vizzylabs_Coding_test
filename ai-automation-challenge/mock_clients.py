@@ -151,16 +151,55 @@ class MockAnthropicClient:
                 if msg.get("role") == "user":
                     user_content = msg.get("content", "")
 
-            # Claude tends to be more nuanced than keyword matching
-            # This could be used for appeal review or secondary analysis
+            text = user_content.lower()
+
             response_json = {
                 "is_safe": True,
                 "confidence": 0.85,
                 "violation_type": "none",
-                "reasoning": "Content appears to be within community guidelines.",
+                "reasoning": "Secondary reviewer found contextual cues that make the content likely acceptable.",
                 "requires_human_review": False,
-                "context_notes": "Automated analysis - consider context for edge cases."
+                "context_notes": "Automated contextual analysis completed."
             }
+
+            if any(word in text for word in ["cook", "recipe", "kitchen", "vegetable", "food"]):
+                response_json["reasoning"] = "References to cooking suggest the knife or cutting language is instructional rather than violent."
+            elif any(word in text for word in ["fitness", "gym", "exercise", "training"]):
+                response_json["reasoning"] = "Fitness context suggests body-related terms are not necessarily sexual content."
+            elif any(word in text for word in ["doctor", "medical", "health", "nurse"]):
+                response_json["reasoning"] = "Medical context suggests the language is educational or clinical rather than graphic violence."
+            elif any(word in text for word in ["those people", "you know who", "certain types"]):
+                response_json.update({
+                    "is_safe": False,
+                    "confidence": 0.67,
+                    "violation_type": "hate_speech",
+                    "reasoning": "The content uses coded group-targeting language and should be escalated for human review.",
+                    "requires_human_review": True,
+                })
+            elif any(word in text for word in ["miracle", "secret", "one weird trick", "doctors hate"]) and any(
+                word in text for word in ["weight loss", "muscle", "energy", "supplement"]
+            ):
+                response_json.update({
+                    "is_safe": False,
+                    "confidence": 0.74,
+                    "violation_type": "spam",
+                    "reasoning": "The content contains manipulative supplement-marketing language and should be reviewed before distribution.",
+                    "requires_human_review": True,
+                })
+            elif any(word in text for word in ["kill", "attack", "destroy", "murder", "racist", "slur", "nsfw", "explicit", "xxx"]):
+                violation_type = "violence"
+                if any(word in text for word in ["racist", "slur"]):
+                    violation_type = "hate_speech"
+                elif any(word in text for word in ["nsfw", "explicit", "xxx"]):
+                    violation_type = "adult_content"
+
+                response_json.update({
+                    "is_safe": False,
+                    "confidence": 0.95,
+                    "violation_type": violation_type,
+                    "reasoning": "The content contains a clear policy violation and should remain blocked.",
+                    "requires_human_review": False,
+                })
 
             return MockMessage(json.dumps(response_json))
 
